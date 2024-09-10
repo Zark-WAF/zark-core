@@ -1,0 +1,19 @@
+[package]
+name = "zark_waf_module_manager"
+version = "0.1.0"
+edition = "2021"
+authors = ["I. Zeqiri <indrit.zeqiri@gmail.com>", "E. Gjergji <eriol@rtsoftwaregroup.io>"]
+description = "Module manager for ZARK-WAF"
+license = "MIT"
+repository = "https://github.com/Zark-WAF/zark-core"    
+
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zark_waf_common = { path = "../common" }
+libloading = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+
+

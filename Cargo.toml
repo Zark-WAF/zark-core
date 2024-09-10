@@ -1,0 +1,28 @@
+[package]
+name = "zark_waf"
+version = "0.1.0"
+edition = "2021"
+authors = ["I. Zeqiri <indrit.zeqiri@gmail.com>", "E. Gjergji"]
+description = "ZARK-WAF"
+license = "MIT"
+
+[lib]
+name = "zark_waf"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+
+[dependencies]
+async-trait = "0.1"
+serde_json = "1.0"
+
+zark_waf_common = { path = "./crates/common" }
+zark_waf_plugin_system = { path = "./crates/plugin_system" }
+
+
+
+
+[workspace]
+members = [
+    "crates/*"
+]

@@ -1,0 +1,110 @@
+{
+    "zark-core": {
+        "thread-pool-size": 4,
+        "max-connections": 10000
+    },
+    "zark-logger": {
+        "log-type": [
+            "stdout",
+            "file",
+            "console"
+        ],
+        "log-path": "/var/log/zark/zark.log",
+        "log-level": "info",
+        "log-max-size": 1000000,
+        "log-max-backups": 10,
+        "log-max-age": 30,
+        "log-compress": true
+    },
+    "web-servers": {
+        "nginx": {
+            "enabled": true,
+            "config-path": "/etc/nginx/nginx.conf",
+            "pid-path": "/var/run/nginx.pid",
+            "log-path": "/var/log/nginx/access.log",
+            "error-log-path": "/var/log/nginx/error.log",
+            "port": 80,
+            "host": "0.0.0.0",
+            "ssl-enabled": false,
+            "ssl-cert-path": "/etc/nginx/ssl/cert.pem",
+            "ssl-key-path": "/etc/nginx/ssl/key.pem",
+            "ssl-port": 443,
+            "ssl-host": "0.0.0.0",
+            "ssl-protocols": [
+                "TLSv1.2",
+                "TLSv1.3"
+            ]
+        },
+        "apache2": {
+            "enabled": false,
+            "config-path": "/etc/apache2/apache2.conf",
+            "pid-path": "/var/run/apache2.pid",
+            "log-path": "/var/log/apache2/access.log",
+            "error-log-path": "/var/log/apache2/error.log",
+            "port": 80,
+            "host": "0.0.0.0",
+            "ssl-enabled": false,
+            "ssl-cert-path": "/etc/apache2/ssl/cert.pem",
+            "ssl-key-path": "/etc/apache2/ssl/key.pem",
+            "ssl-port": 443,
+            "ssl-host": "0.0.0.0",
+            "ssl-protocols": [
+                "TLSv1.2",
+                "TLSv1.3"
+            ]
+        },
+        "ha-proxy": {
+            "enabled": false,
+            "config-path": "/etc/haproxy/haproxy.cfg",
+            "pid-path": "/var/run/haproxy.pid",
+            "log-path": "/var/log/haproxy/access.log",
+            "error-log-path": "/var/log/haproxy/error.log",
+            "port": 80,
+            "host": "0.0.0.0",
+            "ssl-enabled": false,
+            "ssl-cert-path": "/etc/haproxy/ssl/cert.pem",
+            "ssl-key-path": "/etc/haproxy/ssl/key.pem",
+            "ssl-port": 443,
+            "ssl-host": "0.0.0.0",
+            "ssl-protocols": [
+                "TLSv1.2",
+                "TLSv1.3"
+            ]
+        },
+        "iis": {
+            "enabled": false,
+            "config-path": "/etc/iis/iis.conf",
+            "pid-path": "/var/run/iis.pid",
+            "log-path": "/var/log/iis/access.log",
+            "error-log-path": "/var/log/iis/error.log",
+            "port": 80,
+            "host": "0.0.0.0",
+            "ssl-enabled": false,
+            "ssl-cert-path": "/etc/iis/ssl/cert.pem",
+            "ssl-key-path": "/etc/iis/ssl/key.pem",
+            "ssl-port": 443,
+            "ssl-host": "0.0.0.0",
+            "ssl-protocols": [
+                "TLSv1.2",
+                "TLSv1.3"
+            ]
+        }
+    },
+    "monitoring": {
+        "prometheus": {
+            "enabled": true,
+            "port": 9090,
+            "host": "0.0.0.0"
+        },
+        "grafana": {
+            "enabled": true,
+            "port": 3000,
+            "host": "0.0.0.0"
+        },
+        "alertmanager": {
+            "enabled": true,
+            "port": 9093,
+            "host": "0.0.0.0"
+        }
+    }
+}
