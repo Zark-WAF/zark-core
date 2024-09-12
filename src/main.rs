@@ -22,10 +22,45 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-use zark_waf_core::ZarkWafCore;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let core = ZarkWafCore::new("config/config.json")?;
-    core.run()?;
+mod core;
+
+use clap::Parser;
+use log::{error, info};
+use crate::core::ZarkWafCore;
+
+#[derive(Parser)]
+#[clap(version = env!("CARGO_PKG_VERSION"), author = "I. Zeqiri, E. Gjergji")]
+struct Opts {
+    #[clap(short, long, default_value = "config/config.json")]
+    config: String,
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Initialize logging
+    env_logger::init();
+
+    // Parse command line arguments
+    let opts: Opts = Opts::parse();
+
+    info!("Starting ZARK-WAF...");
+
+    // Initialize the core
+    let core = match ZarkWafCore::new(&opts.config).await {
+        Ok(core) => core,
+        Err(e) => {
+            error!("Failed to initialize ZARK-WAF core: {}", e);
+            return Err(e.into());
+        }
+    };
+
+    // Run the core
+    if let Err(e) = core.run().await {
+        error!("ZARK-WAF core encountered an error: {}", e);
+        return Err(e.into());
+    }
+
+    info!("ZARK-WAF shutting down...");
     Ok(())
 }

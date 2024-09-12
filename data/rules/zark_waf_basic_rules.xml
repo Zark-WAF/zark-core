@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rules>
+    <!-- SQL Injection Prevention -->
+    <rule name="block_sql_injection">
+        <condition>
+            <field>REQUEST_URI</field>
+            <operator>contains</operator>
+            <value>union select</value>
+        </condition>
+        <action>BLOCK</action>
+    </rule>
+    
+    <rule name="log_sql_keywords">
+        <condition>
+            <field>REQUEST_BODY</field>
+            <operator>contains</operator>
+            <value>DROP TABLE</value>
+        </condition>
+        <action>LOG</action>
+    </rule>
+
+    <!-- XSS Protection -->
+    <rule name="block_xss_script_tags">
+        <condition>
+            <field>REQUEST_HEADERS</field>
+            <operator>contains</operator>
+            <value>&lt;script&gt;</value>
+        </condition>
+        <action>BLOCK</action>
+    </rule>
+
+    <rule name="sanitize_xss_attempt">
+        <condition>
+            <field>REQUEST_PARAMS</field>
+            <operator>contains</operator>
+            <value>javascript:</value>
+        </condition>
+        <action>SANITIZE</action>
+    </rule>
+
+    <!-- Rate Limiting -->
+    <rule name="rate_limit_api">
+        <condition>
+            <field>REQUEST_PATH</field>
+            <operator>starts_with</operator>
+            <value>/api/</value>
+        </condition>
+        <action>RATE_LIMIT</action>
+        <limit>
+            <requests>100</requests>
+            <per_second>60</per_second>
+        </limit>
+    </rule>
+
+    <!-- File Upload Protection -->
+    <rule name="block_executable_upload">
+        <condition>
+            <field>UPLOAD_FILENAME</field>
+            <operator>ends_with</operator>
+            <value>.exe</value>
+        </condition>
+        <action>BLOCK</action>
+    </rule>
+
+    <!-- IP Blacklisting -->
+    <rule name="block_known_bad_ip">
+        <condition>
+            <field>REMOTE_ADDR</field>
+            <operator>equals</operator>
+            <value>192.0.2.1</value>
+        </condition>
+        <action>BLOCK</action>
+    </rule>
+
+    <!-- User Agent Filtering -->
+    <rule name="block_suspicious_user_agent">
+        <condition>
+            <field>USER_AGENT</field>
+            <operator>contains</operator>
+            <value>sqlmap</value>
+        </condition>
+        <action>BLOCK</action>
+    </rule>
+
+    <!-- CSRF Token Validation -->
+    <rule name="enforce_csrf_token">
+        <condition>
+            <field>REQUEST_METHOD</field>
+            <operator>equals</operator>
+            <value>POST</value>
+        </condition>
+        <action>VALIDATE_CSRF</action>
+    </rule>
+
+    <!-- Path Traversal Prevention -->
+    <rule name="block_path_traversal">
+        <condition>
+            <field>REQUEST_URI</field>
+            <operator>contains</operator>
+            <value>../</value>
+        </condition>
+        <action>BLOCK</action>
+    </rule>
+
+    <!-- Content-Type Enforcement -->
+    <rule name="enforce_json_content_type">
+        <condition>
+            <field>REQUEST_PATH</field>
+            <operator>starts_with</operator>
+            <value>/api/</value>
+        </condition>
+        <action>ENFORCE_CONTENT_TYPE</action>
+        <content_type>application/json</content_type>
+    </rule>
+
+    <!-- Custom Header Requirement -->
+    <rule name="require_custom_header">
+        <condition>
+            <field>REQUEST_HEADERS</field>
+            <operator>not_contains</operator>
+            <value>X-API-Key</value>
+        </condition>
+        <action>BLOCK</action>
+    </rule>
+
+    <!-- sensitive Data Exposure Prevention -->
+    <rule name="mask_credit_card_in_response">
+        <condition>
+            <field>RESPONSE_BODY</field>
+            <operator>contains</operator>
+            <value>credit_card_number</value>
+        </condition>
+        <action>MASK</action>
+        <mask_pattern>\d{13,16}</mask_pattern>
+    </rule>
+
+    <!-- Logging Successful Logins -->
+    <rule name="log_successful_login">
+        <condition>
+            <field>RESPONSE_STATUS</field>
+            <operator>equals</operator>
+            <value>200</value>
+        </condition>
+        <condition>
+            <field>REQUEST_PATH</field>
+            <operator>equals</operator>
+            <value>/login</value>
+        </condition>
+        <action>LOG</action>
+        <log_level>INFO</log_level>
+    </rule>
+</rules>

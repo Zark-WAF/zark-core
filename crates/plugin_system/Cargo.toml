@@ -8,17 +8,18 @@ license = "MIT"
 repository = "https://github.com/Zark-WAF/zark-core"
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+zark_waf_common = { path = "../common" }
 async-trait = "0.1"
+tokio = { version = "1.0", features = ["full"] }
+thiserror = "1.0"
+log = "0.4"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 libloading = "0.7"
-tokio = { version = "1", features = ["full"] }
-thiserror = "1.0"
-zark_waf_common = { path = "../common" }
+dashmap = "5.1"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["full"] }
-
-
+tokio-test = "0.4"

@@ -1,4 +1,3 @@
- 
 // MIT License
 // 
 // Copyright (c) 2024 ZARK-WAF
@@ -23,25 +22,44 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use crate::config::Config;
-use crate::error::ConfigError;
+use serde::{Serialize, Deserialize};
 
-pub struct ConfigUpdater {
-    config: Arc<RwLock<Config>>,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Rules {
+    #[serde(rename = "rule")]
+    pub rules: Vec<Rule>,
 }
 
-impl ConfigUpdater {
-    pub fn new(config: Arc<RwLock<Config>>) -> Self {
-        Self { config }
-    }
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Rule {
+    #[serde(rename = "@name")]
+    pub name: String,
+    pub condition: Condition,
+    pub action: Action,
+}
 
-    pub async fn apply_changes(&self) -> Result<(), ConfigError> {
-        let _config = self.config.read().await;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Condition {
+    pub field: String,
+    pub operator: Operator,
+    pub value: String,
+}
 
-        //Todo: Implement the logic to apply configuration changes
-        log::info!("Applying configuration changes");
-        Ok(())
-    }
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Operator {
+    #[serde(rename = "contains")]
+    Contains,
+    #[serde(rename = "equals")]
+    Equals,
+    #[serde(rename = "starts_with")]
+    StartsWith,
+    #[serde(rename = "ends_with")]
+    EndsWith,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Action {
+    BLOCK,
+    ALLOW,
+    LOG,
 }

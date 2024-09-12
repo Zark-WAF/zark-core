@@ -24,23 +24,35 @@
 
 use thiserror::Error;
 
-
 #[derive(Error, Debug)]
-pub enum ZarkPluginError {
-    #[error("Failed to load library: {0}")]
-    LibraryError(#[from] libloading::Error),
+pub enum PluginError {
+    #[error("Failed to load plugin: {0}")]
+    LoadError(String),
 
-    #[error("Plugin initialization error: {0}")]
-    InitError(String),
-
-    #[error("Plugin execution error: {0}")]
-    ExecutionError(String),
+    #[error("Failed to unload plugin: {0}")]
+    UnloadError(String),
 
     #[error("Plugin not found: {0}")]
     PluginNotFound(String),
 
+    #[error("Plugin initialization error: {0}")]
+    InitializationError(String),
+
+    #[error("Plugin execution error: {0}")]
+    ExecutionError(String),
+
+    #[error("Plugin shutdown error: {0}")]
+    ShutdownError(String),
+
     #[error("Invalid plugin: {0}")]
     InvalidPlugin(String),
-}
 
-impl std::error::Error for ZarkPluginError {}
+    #[error("I/O error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] serde_json::Error),
+
+    #[error("Library loading error: {0}")]
+    LibraryError(#[from] libloading::Error),
+}

@@ -22,76 +22,76 @@
 //
 // Authors: I. Zeqiri, E. Gjergji 
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use libloading::{Library, Symbol};
-use crate::error::ZarkPluginError;
-use crate::plugin::{ZarkPlugin, PluginCreate};
+use dashmap::DashMap;
+use crate::error::PluginError;
+use crate::plugin::{Plugin, PluginMetadata, PluginStatus};
+use zark_waf_common::messaging::messenger::ZarkMessenger;
 
-
-pub struct ZarkPluginManager {
-    plugins: RwLock<HashMap<String, Box<dyn ZarkPlugin>>>,
-    libraries: RwLock<HashMap<String, Arc<Library>>>,
-    broker: Arc<ZarkMessenger>,
+pub struct PluginManager {
+    plugins: DashMap<String, Arc<RwLock<Box<dyn Plugin>>>>,
+    messenger: Arc<ZarkMessenger>,
 }
 
-impl ZarkPluginManager {
-    pub fn new(broker: Arc<ZarkMessenger>) -> Self {
-        ZarkPluginManager {
-            plugins: RwLock::new(HashMap::new()),
-            libraries: RwLock::new(HashMap::new()),
-            broker,
+impl PluginManager {
+    pub fn new(messenger: Arc<ZarkMessenger>) -> Self {
+        Self {
+            plugins: DashMap::new(),
+            messenger,
         }
     }
 
-    pub async fn load_plugin<P: AsRef<Path>>(&self, path: P) -> Result<(), ZarkPluginError> {
-        let path = path.as_ref().to_path_buf();
-        let library = unsafe { Library::new(&path)? };
-        let library = Arc::new(library);
-
-        let create_plugin: Symbol<PluginCreate> = unsafe {
-            library.get(b"_create_plugin")?
-        };
-
-        let plugin = unsafe {
-            Box::from_raw(create_plugin())
-        };
-
+    pub async fn add_plugin(&self, plugin: Box<dyn Plugin>) -> Result<(), PluginError> {
         let name = plugin.name().to_string();
-        plugin.init(self.broker.clone()).await?;
-
-        let mut plugins = self.plugins.write().await;
-        let mut libraries = self.libraries.write().await;
-
-        plugins.insert(name.clone(), plugin);
-        libraries.insert(name, library);
-
+        let mut plugin = plugin;
+        plugin.init(self.messenger.clone()).await.map_err(|e| PluginError::InitializationError(e.to_string()))?;
+        self.plugins.insert(name.clone(), Arc::new(RwLock::new(plugin)));
         Ok(())
     }
 
-    pub async fn unload_plugin(&self, name: &str) -> Result<(), ZarkPluginError> {
-        let mut plugins = self.plugins.write().await;
-        let mut libraries = self.libraries.write().await;
-
-        if let Some(mut plugin) = plugins.remove(name) {
-            plugin.shutdown().await?;
-        }
-        libraries.remove(name);
-
-        Ok(())
-    }
-
-    pub async fn execute_plugin(&self, name: &str, input: serde_json::Value) -> Result<serde_json::Value, ZarkPluginError> {
-        let plugins = self.plugins.read().await;
-        if let Some(plugin) = plugins.get(name) {
-            Ok(plugin.execute(input).await?)
+    pub async fn remove_plugin(&self, name: &str) -> Result<(), PluginError> {
+        if let Some((_, plugin)) = self.plugins.remove(name) {
+            let mut plugin = plugin.write().await;
+            plugin.shutdown().await.map_err(|e| PluginError::ShutdownError(e.to_string()))?;
         } else {
-            Err(ZarkPluginError::PluginNotFound(name.to_string()))
+            return Err(PluginError::PluginNotFound(name.to_string()));
+        }
+        Ok(())
+    }
+
+    pub async fn execute_plugin(&self, name: &str, input: serde_json::Value) -> Result<serde_json::Value, PluginError> {
+        if let Some(plugin) = self.plugins.get(name) {
+            let plugin = plugin.read().await;
+            plugin.execute(input).await.map_err(|e| PluginError::ExecutionError(e.to_string()))
+        } else {
+            Err(PluginError::PluginNotFound(name.to_string()))
         }
     }
 
-    
+    pub async fn get_plugin_metadata(&self, name: &str) -> Result<PluginMetadata, PluginError> {
+        if let Some(plugin) = self.plugins.get(name) {
+            let plugin = plugin.read().await;
+            Ok(PluginMetadata {
+                name: plugin.name().to_string(),
+                version: plugin.version().to_string(),
+                description: plugin.description().to_string(),
+                status: PluginStatus::Running, // This should be more dynamic in a real implementation
+            })
+        } else {
+            Err(PluginError::PluginNotFound(name.to_string()))
+        }
+    }
 
+    pub fn list_plugins(&self) -> Vec<PluginMetadata> {
+        self.plugins.iter().map(|entry| {
+            let plugin = entry.value().blocking_read();
+            PluginMetadata {
+                name: plugin.name().to_string(),
+                version: plugin.version().to_string(),
+                description: plugin.description().to_string(),
+                status: PluginStatus::Running, // This should be more dynamic in a real implementation
+            }
+        }).collect()
+    }
 }

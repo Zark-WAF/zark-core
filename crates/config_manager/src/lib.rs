@@ -21,3 +21,51 @@
 // SOFTWARE.
 //
 // Authors: I. Zeqiri, E. Gjergji 
+
+pub mod config;
+pub mod watcher;
+pub mod updater;
+pub mod error;
+
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use crate::config::Config;
+use crate::watcher::ConfigWatcher;
+use crate::updater::ConfigUpdater;
+use crate::error::ConfigError;
+
+pub struct ConfigManager {
+    config: Arc<RwLock<Config>>,
+    watcher: ConfigWatcher,
+    // TODO: Implement usage of updater
+    updater: ConfigUpdater,
+}
+
+impl ConfigManager {
+    pub async fn new(config_path: &str) -> Result<Self, ConfigError> {
+        let config = Config::load(config_path).await?;
+        let config = Arc::new(RwLock::new(config));
+        let watcher = ConfigWatcher::new(config_path.to_string(), Arc::clone(&config));
+        let updater = ConfigUpdater::new(Arc::clone(&config));
+
+        Ok(Self {
+            config,
+            watcher,
+            updater,
+        })
+    }
+
+    pub async fn start(&mut self) -> Result<(), ConfigError> {
+        self.watcher.start().await?;
+        Ok(())
+    }
+
+    pub async fn stop(&mut self) -> Result<(), ConfigError> {
+        self.watcher.stop().await?;
+        Ok(())
+    }
+
+    pub async fn get_config(&self) -> Config {
+        self.config.read().await.clone()
+    }
+}

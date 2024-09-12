@@ -2,27 +2,52 @@
 name = "zark_waf"
 version = "0.1.0"
 edition = "2021"
-authors = ["I. Zeqiri <indrit.zeqiri@gmail.com>", "E. Gjergji"]
-description = "ZARK-WAF"
+authors = ["I. Zeqiri <indrit.zeqiri@gmail.com>", "E. Gjergji <eriol@rtsoftwaregroup.io>"]
+description = "ZARK-WAF: A modular Web Application Firewall"
 license = "MIT"
+build = "build-sys/build.rs"
 
-[lib]
-name = "zark_waf"
-path = "src/lib.rs"
-crate-type = ["cdylib"]
+[package.metadata.commands]
+post-build = [
+    "cargo run --bin post_build_script"
+]
+
+[[bin]]
+name = "post_build_script"
+path = "build-sys/post_build.rs"
+
 
 
 [dependencies]
+tokio = { version = "1.0", features = ["full"] }
 async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+thiserror = "1.0"
+log = "0.4"
+env_logger = "0.9"
+clap = { version = "3.0", features = ["derive"] }
 
-zark_waf_common = { path = "./crates/common" }
-zark_waf_plugin_system = { path = "./crates/plugin_system" }
-
-
-
+zark_waf_common = { path = "crates/common" }
+zark_waf_plugin_system = { path = "crates/plugin_system" }
+zark_waf_module_manager = { path = "crates/module_manager" }
+zark_waf_config_manager = { path = "crates/config_manager" }
+zark_waf_logger = { path = "crates/logger" }
 
 [workspace]
 members = [
-    "crates/*"
+    "crates/common",
+    "crates/plugin_system",
+    "crates/module_manager",
+    "crates/config_manager",
+    "crates/logger",
+    "crates/metrics",
+    "crates/event_sourcing",
+    "crates/sandbox",
+    "crates/self_healing",
+    "crates/reputation_system",
+    "crates/ml_module",
+    "crates/dsl",
+    "crates/chaos_engineering",
+    "crates/adaptive_rate_limiter",
 ]

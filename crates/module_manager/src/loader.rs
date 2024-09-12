@@ -22,19 +22,39 @@
 //
 // Authors: I. Zeqiri, E. Gjergji 
 
-use libloading::{Library, Symbol};
 use std::path::Path;
-use crate::error::ModuleError;
-use zark_waf_common::Module;
+use libloading::{Library, Symbol};
+use crate::error::ModuleManagerError;
+use crate::module::Module;
 
 pub struct ModuleLoader;
 
-impl ZarkModuleLoader {
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Box<dyn Module>, ModuleError> {
-        unsafe {
-            let lib = Library::new(path.as_ref())?;
-            let constructor: Symbol<unsafe fn() -> Box<dyn Module>> = lib.get(b"_create_module")?;
-            Ok(constructor())
-        }
+type ModuleCreateFn = unsafe fn() -> *mut dyn Module;
+
+impl ModuleLoader {
+    pub fn new() -> Self {
+        ModuleLoader
+    }
+
+    pub async fn load<P: AsRef<Path>>(&self, path: P) -> Result<Box<dyn Module>, ModuleManagerError> {
+        let path = path.as_ref().to_path_buf();
+        
+        // Load the dynamic library
+        let lib = unsafe {
+            Library::new(path.clone()).map_err(|e| ModuleManagerError::LoadError(e.to_string()))?
+        };
+
+        // Look up the `create_module` symbol
+        let constructor: Symbol<ModuleCreateFn> = unsafe {
+            lib.get(b"create_module")
+                .map_err(|e| ModuleManagerError::LoadError(format!("Failed to find 'create_module' symbol: {}", e)))?
+        };
+
+        // Call the constructor
+        let module = unsafe {
+            Box::from_raw(constructor())
+        };
+
+        Ok(module)
     }
 }

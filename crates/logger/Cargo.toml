@@ -15,6 +15,7 @@ log = "0.4"
 fern = { version = "0.6", features = ["colored"] }
 chrono = "0.4"
 serde_json = "1.0"
+serde = "1.0"
 thiserror = "1.0"
 async-trait = "0.1"
 tokio = { version = "1.0", features = ["full"] }

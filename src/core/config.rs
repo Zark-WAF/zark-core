@@ -24,102 +24,58 @@
 
 use serde::Deserialize;
 use std::fs::File;
-use std::io::BufReader;
-use crate::core::error::ZarkWafError;
+use std::io::Read;
+use crate::core::error::CoreError;
+use zark_waf_logger::logger::LoggerConfig;
 
-#[derive(Deserialize)]
+
+#[derive(Deserialize, Clone)]
 pub struct Config {
-    #[serde(rename = "zark-core")]
-    pub zark_core: ZarkCore,
-    #[serde(rename = "zark-logger")]
-    pub zark_logger: ZarkLogger,
-    #[serde(rename = "web-servers")]
-    pub web_servers: WebServers,
-    pub monitoring: Monitoring,
+    pub general: GeneralConfig,
+    pub logger: LoggerConfig,
+    pub web_servers: WebServersConfig,
+    pub modules: ModulesConfig,
+    pub plugins: PluginsConfig,
 }
 
-#[derive(Deserialize)]
-pub struct ZarkCore {
-    #[serde(rename = "thread-pool-size")]
-    pub thread_pool_size: u32,
-    #[serde(rename = "max-connections")]
-    pub max_connections: u32,
+#[derive(Deserialize, Clone)]
+pub struct GeneralConfig {
+    pub thread_pool_size: usize,
+    pub max_connections: usize,
 }
 
-#[derive(Deserialize)]
-pub struct ZarkLogger {
-    #[serde(rename = "log-type")]
-    pub log_type: Vec<String>,
-    #[serde(rename = "log-path")]
-    pub log_path: String,
-    #[serde(rename = "log-level")]
-    pub log_level: String,
-    #[serde(rename = "log-max-size")]
-    pub log_max_size: u64,
-    #[serde(rename = "log-max-backups")]
-    pub log_max_backups: u32,
-    #[serde(rename = "log-max-age")]
-    pub log_max_age: u32,
-    #[serde(rename = "log-compress")]
-    pub log_compress: bool,
-}
 
-#[derive(Deserialize)]
-pub struct WebServers {
+
+
+#[derive(Deserialize, Clone)]
+pub struct WebServersConfig {
     pub nginx: WebServerConfig,
-    pub apache2: WebServerConfig,
-    #[serde(rename = "ha-proxy")]
-    pub ha_proxy: WebServerConfig,
+    pub apache: WebServerConfig,
+    pub haproxy: WebServerConfig,
     pub iis: WebServerConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct WebServerConfig {
     pub enabled: bool,
-    #[serde(rename = "config-path")]
     pub config_path: String,
-    #[serde(rename = "pid-path")]
-    pub pid_path: String,
-    #[serde(rename = "log-path")]
-    pub log_path: String,
-    #[serde(rename = "error-log-path")]
-    pub error_log_path: String,
-    pub port: u16,
-    pub host: String,
-    #[serde(rename = "ssl-enabled")]
-    pub ssl_enabled: bool,
-    #[serde(rename = "ssl-cert-path")]
-    pub ssl_cert_path: String,
-    #[serde(rename = "ssl-key-path")]
-    pub ssl_key_path: String,
-    #[serde(rename = "ssl-port")]
-    pub ssl_port: u16,
-    #[serde(rename = "ssl-host")]
-    pub ssl_host: String,
-    #[serde(rename = "ssl-protocols")]
-    pub ssl_protocols: Vec<String>,
 }
 
-#[derive(Deserialize)]
-pub struct Monitoring {
-    pub prometheus: MonitoringConfig,
-    pub grafana: MonitoringConfig,
-    pub alertmanager: MonitoringConfig,
+#[derive(Deserialize, Clone)]
+pub struct ModulesConfig {
+    pub load_paths: Vec<String>,
 }
 
-#[derive(Deserialize)]
-pub struct MonitoringConfig {
-    pub enabled: bool,
-    pub port: u16,
-    pub host: String,
+#[derive(Deserialize, Clone)]
+pub struct PluginsConfig {
+    pub load_paths: Vec<String>,
 }
 
 impl Config {
-    pub fn load(path: &str) -> Result<Self, WafError> {
-        let file = File::open(path).map_err(|e| WafError::ConfigError(format!("Failed to open config file: {}", e)))?;
-        let reader = BufReader::new(file);
-        let config: Config = serde_json::from_reader(reader)
-            .map_err(|e| WafError::ConfigError(format!("Failed to parse config file: {}", e)))?;
-        Ok(config)
+    pub fn load(path: &str) -> Result<Self, CoreError> {
+        let mut file = File::open(path).map_err(|e| CoreError::ConfigError(format!("Failed to open config file: {}", e)))?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).map_err(|e| CoreError::ConfigError(format!("Failed to read config file: {}", e)))?;
+        serde_json::from_str(&contents).map_err(|e| CoreError::ConfigError(format!("Failed to parse config: {}", e)))
     }
 }

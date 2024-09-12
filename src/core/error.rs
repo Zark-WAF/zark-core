@@ -23,27 +23,34 @@
 // Authors: I. Zeqiri, E. Gjergji
 
 use thiserror::Error;
+use zark_waf_logger::ZarkLoggerError;
+
 
 #[derive(Error, Debug)]
-pub enum WafError {
+pub enum CoreError {
     #[error("Configuration error: {0}")]
     ConfigError(String),
 
-    #[error("Module error: {0}")]
-    ModuleError(String),
+    #[error("Initialization error: {0}")]
+    InitError(String),
 
     #[error("Runtime error: {0}")]
     RuntimeError(String),
+
+    #[error("Module error: {0}")]
+    ModuleError(#[from] zark_waf_module_manager::ModuleManagerError),
+
+    #[error("Plugin error: {0}")]
+    PluginError(#[from] zark_waf_plugin_system::PluginError),
+
+
+    #[error("Logger error: {0}")]
+    LoggerError(#[from] ZarkLoggerError),
+
 
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
 
     #[error("Serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
-
-    #[error("Broker error: {0}")]
-    BrokerError(String),
-
-    #[error("Unexpected error: {0}")]
-    UnexpectedError(String),
 }

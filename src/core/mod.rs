@@ -22,28 +22,81 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-pub mod config;
-pub mod error;
-pub mod module_interface;
+mod config;
+mod error;
+mod state;
 
 use std::sync::Arc;
+use tokio::sync::RwLock;
+use zark_waf_common::messaging::messenger::ZarkMessenger;
+use zark_waf_module_manager::ModuleManager;
+use zark_waf_plugin_system::PluginSystem;
+use zark_waf_logger::ZarkLogger;
+use crate::core::config::Config;
+use crate::core::error::CoreError;
+use crate::core::state::CoreState;
+use zark_waf_common::Module;
+
 
 pub struct ZarkWafCore {
     config: Config,
-    broker: Arc<Broker>,
-    module_supervisor: Arc<ModuleSupervisor>,
-    shutdown_sender: mpsc::Sender<()>,
-    shutdown_receiver: mpsc::Receiver<()>,
+    state: Arc<RwLock<CoreState>>,
+    messenger: Arc<ZarkMessenger>,
+    module_manager: ModuleManager,
+    plugin_system: PluginSystem,
+    logger: ZarkLogger,
 }
 
 impl ZarkWafCore {
-    pub fn new(config_path: &str) -> Result<Self, error::ZarkWafError> {
-        // TODO: Implement
-        unimplemented()
+    pub async fn new(config_path: &str) -> Result<Self, CoreError> {
+        let config = Config::load(config_path)?;
+        let messenger = Arc::new(ZarkMessenger::new());
+        let module_manager = ModuleManager::new(messenger.clone());
+        let plugin_system = PluginSystem::new(messenger.clone());
+        
+        let logger = ZarkLogger::new(config.logger.clone());
+
+        let mut core = Self {
+            config: config.clone(),
+            state: Arc::new(RwLock::new(CoreState::new())),
+            messenger: messenger.clone(),
+            module_manager,
+            plugin_system,
+            logger,
+        };
+
+        core.init().await?;
+
+        Ok(core)
     }
 
-    pub fn run(&self) -> Result<(), error::ZarkWafError> {
-        // TODO: Implement
-        unimplemented()
+    async fn init(&mut self) -> Result<(), CoreError> {
+        self.logger.init(self.messenger.clone()).await.map_err(|e| CoreError::InitError(e.to_string()))?;
+        
+        Ok(())
+    }
+
+    pub async fn run(&self) -> Result<(), CoreError> {
+        log::info!("ZARK-WAF core is running");
+        
+        // Main loop
+        loop {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    log::info!("Shutdown signal received");
+                    break;
+                }
+                // TODO: Add other sources of events
+            }
+        }
+
+        // Perform cleanup
+        self.shutdown().await
+    }
+
+    async fn shutdown(&self) -> Result<(), CoreError> {
+        log::info!("Shutting down ZARK-WAF core");
+        // Shutdown logic: stop modules, unload plugins, etc.
+        Ok(())
     }
 }

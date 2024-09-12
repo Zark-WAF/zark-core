@@ -23,10 +23,52 @@
 // Authors: I. Zeqiri, E. Gjergji 
 
 
-pub mod plugin;
-pub mod manager;
-pub mod error;
+mod error;
+mod plugin;
+mod manager;
+mod loader;
 
-pub use plugin::ZarkPlugin;
-pub use manager::ZarkPluginManager;
-pub use error::ZarkPluginError;
+pub use error::PluginError;
+pub use plugin::{Plugin, PluginMetadata};
+pub use manager::PluginManager;
+pub use loader::PluginLoader;
+
+use zark_waf_common::messaging::messenger::ZarkMessenger;
+use std::sync::Arc;
+
+pub struct PluginSystem {
+    manager: PluginManager,
+    loader: PluginLoader,
+}
+
+impl PluginSystem {
+    pub fn new(messenger: Arc<ZarkMessenger>) -> Self {
+        Self {
+            manager: PluginManager::new(messenger),
+            loader: PluginLoader::new(),
+        }
+    }
+
+    pub async fn load_plugin(&self, path: &str) -> Result<(), PluginError> {
+        let plugin = self.loader.load(path).await?;
+        self.manager.add_plugin(plugin).await?;
+        Ok(())
+    }
+
+    pub async fn unload_plugin(&self, name: &str) -> Result<(), PluginError> {
+        self.manager.remove_plugin(name).await?;
+        Ok(())
+    }
+
+    pub async fn execute_plugin(&self, name: &str, input: serde_json::Value) -> Result<serde_json::Value, PluginError> {
+        self.manager.execute_plugin(name, input).await
+    }
+
+    pub async fn get_plugin_metadata(&self, name: &str) -> Result<PluginMetadata, PluginError> {
+        self.manager.get_plugin_metadata(name).await
+    }
+
+    pub fn list_plugins(&self) -> Vec<PluginMetadata> {
+        self.manager.list_plugins()
+    }
+}

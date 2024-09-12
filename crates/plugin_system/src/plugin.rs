@@ -23,22 +23,36 @@
 // Authors: I. Zeqiri, E. Gjergji 
 
 use async_trait::async_trait;
-use serde_json::Value;
+use serde::{Serialize, Deserialize};
 use std::sync::Arc;
 use zark_waf_common::messaging::messenger::ZarkMessenger;
 
-
 #[async_trait]
-pub trait ZarkPlugin: Send + Sync {
+pub trait Plugin: Send + Sync {
     fn name(&self) -> &str;
     fn version(&self) -> &str;
     fn description(&self) -> &str;
-    
-    async fn init(&mut self, broker: Arc<ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>>;
-    async fn execute(&self, input: Value) -> Result<Value, Box<dyn std::error::Error>>;
+
+    async fn init(&mut self, messenger: Arc<ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>>;
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
     async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct PluginMetadata {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub status: PluginStatus,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub enum PluginStatus {
+    Loaded,
+    Running,
+    Stopped,
+    Failed,
+}
+
 // This is the type of the function that each plugin must export
-// It is used by the plugin loader to create an instance of the plugin
-pub type PluginCreate = unsafe fn() -> *mut dyn ZarkPlugin;
+pub type PluginCreate = unsafe fn() -> *mut dyn Plugin;

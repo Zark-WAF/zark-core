@@ -20,4 +20,39 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// Authors: I. Zeqiri, E. Gjergji  
+// Authors: I. Zeqiri, E. Gjergji 
+
+use std::path::Path;
+use libloading::{Library, Symbol};
+use crate::error::PluginError;
+use crate::plugin::{Plugin, PluginCreate};
+
+pub struct PluginLoader;
+
+impl PluginLoader {
+    pub fn new() -> Self {
+        PluginLoader
+    }
+
+    pub async fn load<P: AsRef<Path>>(&self, path: P) -> Result<Box<dyn Plugin>, PluginError> {
+        let path = path.as_ref().to_path_buf();
+        
+        // Load the dynamic library
+        let lib = unsafe {
+            Library::new(path.clone()).map_err(|e| PluginError::LoadError(e.to_string()))?
+        };
+
+        // Look up the `create_plugin` symbol
+        let constructor: Symbol<PluginCreate> = unsafe {
+            lib.get(b"create_plugin")
+                .map_err(|e| PluginError::LoadError(format!("Failed to find 'create_plugin' symbol: {}", e)))?
+        };
+
+        // Call the constructor
+        let plugin = unsafe {
+            Box::from_raw(constructor())
+        };
+
+        Ok(plugin)
+    }
+}

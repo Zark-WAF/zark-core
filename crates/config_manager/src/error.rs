@@ -21,4 +21,20 @@
 // SOFTWARE.
 //
 // Authors: I. Zeqiri, E. Gjergji 
- 
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("IO error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("JSON parsing error: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    #[error("Watcher error: {0}")]
+    WatcherError(#[from] notify::Error),
+
+    #[error("Configuration error: {0}")]
+    ConfigurationError(String),
+}

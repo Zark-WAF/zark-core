@@ -21,57 +21,96 @@
 // SOFTWARE.
 //
 // Authors: I. Zeqiri, E. Gjergji 
-
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use zark_waf_common::{Module, Broker};
-use crate::error::ModuleError;
+use dashmap::DashMap;
+use futures::future::join_all;
+use crate::error::ModuleManagerError;
+use crate::module::{Module, ModuleInfo, ModuleStatus};
+use zark_waf_common::messaging::messenger::ZarkMessenger;
 
-pub struct ZarkModuleSupervisor {
-    modules: RwLock<HashMap<String, Box<dyn Module>>>,
-    broker: Arc<Broker>,
+pub struct ModuleSupervisor {
+    modules: DashMap<String, Arc<RwLock<Box<dyn Module>>>>,
+    messenger: Arc<ZarkMessenger>,
 }
 
-impl ZarkModuleSupervisor {
-    pub fn new(broker: Arc<Broker>) -> Self {
-        ZarkModuleSupervisor {
-            modules: RwLock::new(HashMap::new()),
-            broker,
+impl ModuleSupervisor {
+    pub fn new(messenger: Arc<ZarkMessenger>) -> Self {
+        Self {
+            modules: DashMap::new(),
+            messenger,
         }
     }
 
-    pub async fn add_module(&self, name: String, mut module: Box<dyn Module>) -> Result<(), ModuleError> {
-        module.init(self.broker.clone()).await?;
-        let mut modules = self.modules.write().await;
-        modules.insert(name, module);
+    pub async fn add_module(&self, module: Box<dyn Module>) -> Result<(), ModuleManagerError> {
+        let name = module.name().to_string();
+        let mut module = module;
+        module.init(self.messenger.clone()).await.map_err(|e| ModuleManagerError::InitializationError(e.to_string()))?;
+        self.modules.insert(name.clone(), Arc::new(RwLock::new(module)));
         Ok(())
     }
 
-    pub async fn remove_module(&self, name: &str) -> Result<(), ModuleError> {
-        let mut modules = self.modules.write().await;
-        if let Some(mut module) = modules.remove(name) {
-            module.shutdown().await?;
-        }
-        Ok(())
-    }
-
-    pub async fn start_all(&self) -> Result<(), ModuleError> {
-        let modules = self.modules.read().await;
-        for (_, module) in modules.iter() {
-            module.start().await?;
+    pub async fn remove_module(&self, name: &str) -> Result<(), ModuleManagerError> {
+        if let Some((_, module)) = self.modules.remove(name) {
+            let module = module.write().await;
+            module.stop().await.map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+        } else {
+            return Err(ModuleManagerError::ModuleNotFound(name.to_string()));
         }
         Ok(())
     }
 
-    pub async fn stop_all(&self) -> Result<(), ModuleError> {
-        let modules = self.modules.read().await;
-        for (_, module) in modules.iter() {
-            module.stop().await?;
-        }
+    pub async fn start_all(&self) -> Result<(), ModuleManagerError> {
+        let futures: Vec<_> = self.modules.iter().map(|entry| {
+            let module = entry.value().clone();
+            async move {
+                let module = module.read().await;
+                module.start().await
+            }
+        }).collect();
+
+        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
         Ok(())
     }
 
-    
+    pub async fn stop_all(&self) -> Result<(), ModuleManagerError> {
+        let futures: Vec<_> = self.modules.iter().map(|entry| {
+            let module = entry.value().clone();
+            async move {
+                let module = module.read().await;
+                module.stop().await
+            }
+        }).collect();
 
+        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()
+            .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn get_module_info(&self, name: &str) -> Result<ModuleInfo, ModuleManagerError> {
+        if let Some(module) = self.modules.get(name) {
+            let module = module.read().await;
+            Ok(ModuleInfo {
+                name: module.name().to_string(),
+                version: module.version().to_string(),
+                description: module.description().to_string(),
+                status: ModuleStatus::Running, // This should be more dynamic in a real implementation
+            })
+        } else {
+            Err(ModuleManagerError::ModuleNotFound(name.to_string()))
+        }
+    }
+
+    pub async fn list_modules(&self) -> Vec<ModuleInfo> {
+        self.modules.iter().map(|entry| {
+            let module = entry.value().blocking_read();
+            ModuleInfo {
+                name: module.name().to_string(),
+                version: module.version().to_string(),
+                description: module.description().to_string(),
+                status: ModuleStatus::Running, // This should be more dynamic in a real implementation
+            }
+        }).collect()
+    }
 }

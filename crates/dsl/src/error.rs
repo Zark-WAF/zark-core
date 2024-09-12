@@ -22,8 +22,16 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-mod logger;
-mod error;
+use thiserror::Error;
 
-pub use logger::ZarkLogger;
-pub use error::ZarkLoggerError;
+#[derive(Error, Debug)]
+pub enum DslError {
+    #[error("XML parsing error: {0}")]
+    XmlParsingError(#[from] quick_xml::de::DeError),
+
+    #[error("XML serialization error: {0}")]
+    XmlSerializationError(#[from] quick_xml::se::Error),
+
+    #[error("Compilation error: {0}")]
+    CompilationError(String),
+}

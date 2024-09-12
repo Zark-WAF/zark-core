@@ -3,13 +3,19 @@ name = "zark_waf_config_manager"
 version = "0.1.0"
 edition = "2021"
 authors = ["I. Zeqiri <indrit.zeqiri@gmail.com>", "E. Gjergji <eriol@rtsoftwaregroup.io>"]
-description = "Config manager for ZARK-WAF"
+description = "Configuration manager for ZARK-WAF"
 license = "MIT"
 repository = "https://github.com/Zark-WAF/zark-core"
 
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+notify = "5.0"
+async-trait = "0.1"
+thiserror = "1.0"
+log = "0.4"
 
 [lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-zark_waf_common = { path = "../common" }
+name = "zark_waf_config_manager"
+crate-type = ["rlib"]

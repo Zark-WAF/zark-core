@@ -20,4 +20,38 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// Authors: I. Zeqiri, E. Gjergji  
+// Authors: I. Zeqiri, E. Gjergji 
+
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+pub enum ModuleManagerError {
+    #[error("Failed to load module: {0}")]
+    LoadError(String),
+
+    #[error("Failed to unload module: {0}")]
+    UnloadError(String),
+
+    #[error("Module not found: {0}")]
+    ModuleNotFound(String),
+
+    #[error("Module initialization error: {0}")]
+    InitializationError(String),
+
+    #[error("Module execution error: {0}")]
+    ExecutionError(String),
+
+    #[error("Module shutdown error: {0}")]
+    ShutdownError(String),
+
+    #[error("Invalid module: {0}")]
+    InvalidModule(String),
+
+    #[error("I/O error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Serialization error: {0}")]
+    SerializationError(#[from] serde_json::Error),
+    #[error("Plugin system error: {0}")]
+    PluginSystemError(String),
+}

@@ -3,13 +3,20 @@ name = "zark_waf_event_sourcing"
 version = "0.1.0"
 edition = "2021"
 authors = ["I. Zeqiri <indrit.zeqiri@gmail.com>", "E. Gjergji <eriol@rtsoftwaregroup.io>"]
-description = "Event sourcing for ZARK-WAF"
+description = "Event sourcing module for ZARK-WAF"
 license = "MIT"
 repository = "https://github.com/Zark-WAF/zark-core"
 
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+log = "0.4"
+zark_waf_common = { path = "../common" }
 
 [lib]
-crate-type = ["cdylib"]
-
-[dependencies]
-zark_waf_common = { path = "../common" }
+crate-type = ["cdylib", "rlib"]

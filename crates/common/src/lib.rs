@@ -24,3 +24,14 @@
 
 pub mod messaging;
 pub mod utils;
+
+use async_trait::async_trait;
+use std::sync::Arc;
+
+#[async_trait]
+pub trait Module: Send + Sync {
+    fn name(&self) -> &str;
+    async fn init(&mut self, broker: Arc<messaging::messenger::ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>>;
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
+    async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>>;
+}

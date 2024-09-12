@@ -26,22 +26,36 @@ use async_trait::async_trait;
 use chrono::Local;
 use fern::colors::{Color, ColoredLevelConfig};
 use log::LevelFilter;
-use serde_json::Value;
 use std::sync::Arc;
-use zark_waf_common::{Module, Broker};
-use zark_waf_config_manager::config::ZarkLogger as LoggerConfig;
-use crate::error::LoggerError;
+use zark_waf_common::messaging::messenger::ZarkMessenger;
+use zark_waf_common::Module; 
+use crate::error::ZarkLoggerError;
+use serde::{Serialize, Deserialize};
+
 
 pub struct ZarkLogger {
     config: LoggerConfig,
 }
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct LoggerConfig {
+    pub log_type: Vec<String>,
+    pub log_path: String,
+    pub log_level: String,
+    pub log_max_size: usize,
+    pub log_max_backups: usize,
+    pub log_max_age: u64,
+    pub log_compress: bool,
+}
+
+
 
 impl ZarkLogger {
     pub fn new(config: LoggerConfig) -> Self {
         ZarkLogger { config }
     }
 
-    fn setup_logger(&self) -> Result<(), LoggerError> {
+    fn setup_logger(&self) -> Result<(), ZarkLoggerError> {
         let colors = ColoredLevelConfig::new()
             .error(Color::Red)
             .warn(Color::Yellow)
@@ -95,7 +109,8 @@ impl ZarkLogger {
             base_config = base_config.chain(file_config);
         }
 
-        // Add syslog logger (Unix only)
+        // implement syslog logger (only for unix)
+        // Todo: Implement the logic to apply configuration changes
         #[cfg(unix)]
         if self.config.log_type.contains(&"syslog".to_string()) {
             use syslog::{Facility, Formatter3164};
@@ -135,16 +150,15 @@ impl Module for ZarkLogger {
         "zark_logger"
     }
 
-    async fn init(&mut self, _broker: Arc<Broker>) -> Result<(), Box<dyn std::error::Error>> {
+    async fn init(&mut self, _broker: Arc<ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>> {
         self.setup_logger()?;
         log::info!("ZarkLogger initialized");
         Ok(())
     }
 
-    async fn execute(&self, input: Value) -> Result<Value, Box<dyn std::error::Error>> {
-        // The logger doesn't need to execute anything, but we'll log the input for demonstration
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
         log::info!("Logger received input: {}", input);
-        Ok(Value::Null)
+        Ok(serde_json::Value::Null)
     }
 
     async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -154,8 +168,7 @@ impl Module for ZarkLogger {
 }
 
 #[no_mangle]
-pub extern "C" fn _create_module() -> *mut dyn Module {
-    
+pub extern "C" fn _create_module() -> *mut ZarkLogger {
     let config = LoggerConfig {
         log_type: vec!["stdout".to_string(), "file".to_string()],
         log_path: "/var/log/zark_waf.log".to_string(),

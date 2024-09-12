@@ -1,4 +1,3 @@
- 
 // MIT License
 // 
 // Copyright (c) 2024 ZARK-WAF
@@ -21,27 +20,37 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// Authors: I. Zeqiri, E. Gjergji
+// Authors: I. Zeqiri, E. Gjergji 
 
+use async_trait::async_trait;
+use serde::{Serialize, Deserialize};
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use crate::config::Config;
-use crate::error::ConfigError;
+use zark_waf_common::messaging::messenger::ZarkMessenger;
 
-pub struct ConfigUpdater {
-    config: Arc<RwLock<Config>>,
+#[async_trait]
+pub trait Module: Send + Sync {
+    fn name(&self) -> &str;
+    fn version(&self) -> &str;
+    fn description(&self) -> &str;
+
+    async fn init(&mut self, messenger: Arc<ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>>;
+    async fn start(&self) -> Result<(), Box<dyn std::error::Error>>;
+    async fn stop(&self) -> Result<(), Box<dyn std::error::Error>>;
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
 }
 
-impl ConfigUpdater {
-    pub fn new(config: Arc<RwLock<Config>>) -> Self {
-        Self { config }
-    }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ModuleInfo {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    pub status: ModuleStatus,
+}
 
-    pub async fn apply_changes(&self) -> Result<(), ConfigError> {
-        let _config = self.config.read().await;
-
-        //Todo: Implement the logic to apply configuration changes
-        log::info!("Applying configuration changes");
-        Ok(())
-    }
+#[derive(Clone, Serialize, Deserialize)]
+pub enum ModuleStatus {
+    Loaded,
+    Running,
+    Stopped,
+    Failed,
 }

@@ -1,4 +1,3 @@
- 
 // MIT License
 // 
 // Copyright (c) 2024 ZARK-WAF
@@ -9,10 +8,10 @@
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-// 
+
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-// 
+
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -23,25 +22,24 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use crate::config::Config;
-use crate::error::ConfigError;
+use thiserror::Error;
 
-pub struct ConfigUpdater {
-    config: Arc<RwLock<Config>>,
+#[derive(Error, Debug)]
+pub enum EventSourcingError {
+    #[error("Failed to append event: {0}")]
+    AppendEvent(String),
+    #[error("Failed to replay events: {0}")]
+    ReplayEvents(String),
+    #[error("Failed to load events: {0}")]
+    LoadEvents(String),
+    #[error("Failed to get event count: {0}")]
+    GetEventCount(String),
+    #[error("Failed to get events: {0}")]
+    GetEvents(String),
+    #[error("Failed to get events: {0}")]
+    DatabaseError(String),
+    #[error("Unknown event type: {0}")]
+    UnknownEventType(String),
+    
 }
 
-impl ConfigUpdater {
-    pub fn new(config: Arc<RwLock<Config>>) -> Self {
-        Self { config }
-    }
-
-    pub async fn apply_changes(&self) -> Result<(), ConfigError> {
-        let _config = self.config.read().await;
-
-        //Todo: Implement the logic to apply configuration changes
-        log::info!("Applying configuration changes");
-        Ok(())
-    }
-}

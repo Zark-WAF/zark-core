@@ -1,4 +1,3 @@
- 
 // MIT License
 // 
 // Copyright (c) 2024 ZARK-WAF
@@ -23,25 +22,8 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use crate::config::Config;
-use crate::error::ConfigError;
+mod error;
+pub mod logger;
 
-pub struct ConfigUpdater {
-    config: Arc<RwLock<Config>>,
-}
-
-impl ConfigUpdater {
-    pub fn new(config: Arc<RwLock<Config>>) -> Self {
-        Self { config }
-    }
-
-    pub async fn apply_changes(&self) -> Result<(), ConfigError> {
-        let _config = self.config.read().await;
-
-        //Todo: Implement the logic to apply configuration changes
-        log::info!("Applying configuration changes");
-        Ok(())
-    }
-}
+pub use logger::ZarkLogger;
+pub use error::ZarkLoggerError;
