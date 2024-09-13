@@ -24,6 +24,7 @@
 
 use thiserror::Error;
 
+
 #[derive(Error, Debug)]
 pub enum ModuleManagerError {
     #[error("Failed to load module: {0}")]
@@ -52,6 +53,7 @@ pub enum ModuleManagerError {
 
     #[error("Serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
-    #[error("Plugin system error: {0}")]
-    PluginSystemError(String),
+
+    #[error("Generic error: {0}")]
+    GenericError(String),
 }

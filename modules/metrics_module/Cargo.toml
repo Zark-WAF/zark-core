@@ -11,4 +11,4 @@ repository = "https://github.com/Zark-WAF/zark-core"
 crate-type = ["cdylib"]
 
 [dependencies]
-zark_waf_common = { path = "../common" }
+zark_waf_common = { path = "../../crates/common" }

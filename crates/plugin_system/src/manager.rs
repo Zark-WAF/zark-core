@@ -22,30 +22,29 @@
 //
 // Authors: I. Zeqiri, E. Gjergji 
 
+use std::ffi::c_void;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use dashmap::DashMap;
 use crate::error::PluginError;
 use crate::plugin::{Plugin, PluginMetadata, PluginStatus};
-use zark_waf_common::messaging::messenger::ZarkMessenger;
 
 pub struct PluginManager {
     plugins: DashMap<String, Arc<RwLock<Box<dyn Plugin>>>>,
-    messenger: Arc<ZarkMessenger>,
+    messenger: *mut c_void,
 }
 
 impl PluginManager {
-    pub fn new(messenger: Arc<ZarkMessenger>) -> Self {
+    pub fn new(messenger: &mut c_void) -> Self {
         Self {
             plugins: DashMap::new(),
-            messenger,
+            messenger: &messenger,
         }
     }
 
-    pub async fn add_plugin(&self, plugin: Box<dyn Plugin>) -> Result<(), PluginError> {
+    pub async fn add_plugin(&self, mut plugin: Box<dyn Plugin>) -> Result<(), PluginError> {
         let name = plugin.name().to_string();
-        let mut plugin = plugin;
-        plugin.init(self.messenger.clone()).await.map_err(|e| PluginError::InitializationError(e.to_string()))?;
+        plugin.init(&self.messenger).await.map_err(|e| PluginError::InitializationError(e.to_string()))?;
         self.plugins.insert(name.clone(), Arc::new(RwLock::new(plugin)));
         Ok(())
     }
@@ -76,7 +75,7 @@ impl PluginManager {
                 name: plugin.name().to_string(),
                 version: plugin.version().to_string(),
                 description: plugin.description().to_string(),
-                status: PluginStatus::Running, // This should be more dynamic in a real implementation
+                status: PluginStatus::Running, 
             })
         } else {
             Err(PluginError::PluginNotFound(name.to_string()))
@@ -90,7 +89,7 @@ impl PluginManager {
                 name: plugin.name().to_string(),
                 version: plugin.version().to_string(),
                 description: plugin.description().to_string(),
-                status: PluginStatus::Running, // This should be more dynamic in a real implementation
+                status: PluginStatus::Running, 
             }
         }).collect()
     }

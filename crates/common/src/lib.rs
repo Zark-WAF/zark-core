@@ -22,16 +22,38 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-pub mod messaging;
 pub mod utils;
 
+use std::ffi::c_void;
+
 use async_trait::async_trait;
-use std::sync::Arc;
+
+pub mod messaging {
+    
+
+    /// A trait for messaging systems.
+    pub trait Messenger: Send + Sync {
+    
+        /// Send a message to a topic.
+        fn send(&self, topic: &str, message: &[u8]) -> Result<(), Box<dyn std::error::Error>>;
+        /// Subscribe to a topic and receive messages.
+        fn subscribe(&self, topic: &str) -> Box<dyn MessageReceiver>;
+    }
+
+    /// A trait for message receivers.
+    pub trait MessageReceiver: Send + Sync {
+        /// Receive a message from the subscribed topic.
+        fn receive(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>>;
+    }
+}
 
 #[async_trait]
 pub trait Module: Send + Sync {
     fn name(&self) -> &str;
-    async fn init(&mut self, broker: Arc<messaging::messenger::ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>>;
+    fn version(&self) -> &str;
+    fn description(&self) -> &str;
+    async fn init(&mut self, messenger: *mut c_void) -> Result<(), Box<dyn std::error::Error>>;
     async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
     async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 }
+

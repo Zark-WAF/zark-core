@@ -36,7 +36,7 @@ impl ModuleLoader {
         ModuleLoader
     }
 
-    pub async fn load<P: AsRef<Path>>(&self, path: P) -> Result<Box<dyn Module>, ModuleManagerError> {
+    pub fn load<P: AsRef<Path>>(&self, path: P) -> Result<Box<dyn Module>, ModuleManagerError> {
         let path = path.as_ref().to_path_buf();
         
         // Load the dynamic library

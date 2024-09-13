@@ -23,13 +23,15 @@
 // Authors: I. Zeqiri, E. Gjergji
 
 use thiserror::Error;
-use zark_waf_logger::ZarkLoggerError;
-
+use zark_waf_config_manager::error::ConfigError;
+use zark_waf_module_manager::ModuleManagerError;
+use zark_waf_plugin_system::PluginError;
 
 #[derive(Error, Debug)]
 pub enum CoreError {
+
     #[error("Configuration error: {0}")]
-    ConfigError(String),
+    ConfigError(#[from] ConfigError),
 
     #[error("Initialization error: {0}")]
     InitError(String),
@@ -37,20 +39,20 @@ pub enum CoreError {
     #[error("Runtime error: {0}")]
     RuntimeError(String),
 
+    #[error("Shutdown error: {0}")]
+    ShutdownError(String),  // Add this line
+
     #[error("Module error: {0}")]
-    ModuleError(#[from] zark_waf_module_manager::ModuleManagerError),
+    ModuleError(#[from] ModuleManagerError),
 
     #[error("Plugin error: {0}")]
-    PluginError(#[from] zark_waf_plugin_system::PluginError),
-
-
-    #[error("Logger error: {0}")]
-    LoggerError(#[from] ZarkLoggerError),
-
+    PluginError(#[from] PluginError),
 
     #[error("I/O error: {0}")]
     IoError(#[from] std::io::Error),
 
     #[error("Serialization error: {0}")]
     SerializationError(#[from] serde_json::Error),
+
+
 }

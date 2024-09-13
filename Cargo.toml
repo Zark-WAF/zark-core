@@ -32,7 +32,7 @@ zark_waf_common = { path = "crates/common" }
 zark_waf_plugin_system = { path = "crates/plugin_system" }
 zark_waf_module_manager = { path = "crates/module_manager" }
 zark_waf_config_manager = { path = "crates/config_manager" }
-zark_waf_logger = { path = "crates/logger" }
+
 
 [workspace]
 members = [
@@ -40,14 +40,5 @@ members = [
     "crates/plugin_system",
     "crates/module_manager",
     "crates/config_manager",
-    "crates/logger",
-    "crates/metrics",
-    "crates/event_sourcing",
-    "crates/sandbox",
-    "crates/self_healing",
-    "crates/reputation_system",
-    "crates/ml_module",
-    "crates/dsl",
-    "crates/chaos_engineering",
-    "crates/adaptive_rate_limiter",
 ]
+

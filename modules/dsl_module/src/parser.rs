@@ -22,40 +22,35 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-use crossbeam_channel::{unbounded, Sender, Receiver};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use serde::{Serialize, Deserialize};
+use quick_xml::de::from_str;
+use crate::ast::*;
+use crate::error::DslError;
 
-
-pub struct ZarkMessenger {
-    subscribers: Arc<Mutex<HashMap<String, Vec<Sender<Vec<u8>>>>>>,
+pub fn parse(input: &str) -> Result<Rules, DslError> {
+    let rules: Rules = from_str(input)?;
+    Ok(rules)
 }
 
-impl ZarkMessenger {
-    pub fn new() -> Self {
-        ZarkMessenger {
-            subscribers: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
+fn parse_condition(pair: pest::iterators::Pair<Rule>) -> Condition {
+    let mut inner = pair.into_inner();
+    let field = inner.next().unwrap().as_str().to_string();
+    let operator = match inner.next().unwrap().as_str() {
+        "contains" => Operator::Contains,
+        "equals" => Operator::Equals,
+        "starts_with" => Operator::StartsWith,
+        "ends_with" => Operator::EndsWith,
+        _ => unreachable!(),
+    };
+    let value = inner.next().unwrap().as_str().to_string();
+    Condition { field, operator, value }
+}
 
-    /// Subscribe to a topic
-    pub fn subscribe(&self, topic: &str) -> Receiver<Vec<u8>> {
-        let (tx, rx) = unbounded();
-        let mut subs = self.subscribers.lock().unwrap();
-        subs.entry(topic.to_string())
-            .or_insert_with(Vec::new)
-            .push(tx);
-        rx
-    }
-
-    /// Publish a message to a topic
-    pub fn publish(&self, topic: &str, message: Vec<u8>) {
-        let subs = self.subscribers.lock().unwrap();
-        if let Some(topic_subs) = subs.get(topic) {
-            for sub in topic_subs {
-                let _ = sub.send(message.clone());
-            }
-        }
+fn parse_action(pair: pest::iterators::Pair<Rule>) -> Action {
+    match pair.as_str() {
+        "BLOCK" => Action::Block,
+        "ALLOW" => Action::Allow,
+        "LOG" => Action::Log,
+        _ => unreachable!(),
     }
 }
+

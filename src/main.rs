@@ -54,6 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Err(e.into());
         }
     };
+    
 
     // Run the core
     if let Err(e) = core.run().await {

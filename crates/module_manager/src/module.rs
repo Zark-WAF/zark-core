@@ -22,21 +22,19 @@
 //
 // Authors: I. Zeqiri, E. Gjergji 
 
+use std::ffi::c_void;
+
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
-use std::sync::Arc;
-use zark_waf_common::messaging::messenger::ZarkMessenger;
 
 #[async_trait]
 pub trait Module: Send + Sync {
     fn name(&self) -> &str;
     fn version(&self) -> &str;
     fn description(&self) -> &str;
-
-    async fn init(&mut self, messenger: Arc<ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>>;
-    async fn start(&self) -> Result<(), Box<dyn std::error::Error>>;
-    async fn stop(&self) -> Result<(), Box<dyn std::error::Error>>;
+    async fn init(&mut self, messenger: *mut c_void) -> Result<(), Box<dyn std::error::Error>>;
     async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
+    async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Clone, Serialize, Deserialize)]

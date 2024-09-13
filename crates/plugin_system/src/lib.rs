@@ -33,8 +33,7 @@ pub use plugin::{Plugin, PluginMetadata};
 pub use manager::PluginManager;
 pub use loader::PluginLoader;
 
-use zark_waf_common::messaging::messenger::ZarkMessenger;
-use std::sync::Arc;
+use std::{os::raw::c_void, sync::Arc};
 
 pub struct PluginSystem {
     manager: PluginManager,
@@ -42,7 +41,7 @@ pub struct PluginSystem {
 }
 
 impl PluginSystem {
-    pub fn new(messenger: Arc<ZarkMessenger>) -> Self {
+    pub fn new(messenger: &mut c_void) -> Self {
         Self {
             manager: PluginManager::new(messenger),
             loader: PluginLoader::new(),

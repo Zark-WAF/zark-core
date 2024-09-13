@@ -35,6 +35,8 @@ use serde::{Serialize, Deserialize};
 
 pub struct ZarkLogger {
     config: LoggerConfig,
+    messenger: *mut c_void,
+
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -150,7 +152,8 @@ impl Module for ZarkLogger {
         "zark_logger"
     }
 
-    async fn init(&mut self, _broker: Arc<ZarkMessenger>) -> Result<(), Box<dyn std::error::Error>> {
+    async fn init(&mut self, messenger: *mut c_void) -> Result<(), Box<dyn std::error::Error>> {
+        self.messenger = messenger;
         self.setup_logger()?;
         log::info!("ZarkLogger initialized");
         Ok(())
@@ -167,6 +170,9 @@ impl Module for ZarkLogger {
     }
 }
 
+//this is the entry point for the module 
+//it is used by the module manager to create the module
+// it returns a boxed pointer to the module
 #[no_mangle]
 pub extern "C" fn _create_module() -> *mut ZarkLogger {
     let config = LoggerConfig {

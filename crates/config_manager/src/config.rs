@@ -23,16 +23,14 @@
 // Authors: I. Zeqiri, E. Gjergji 
 
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 use crate::error::ConfigError;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Config {
-    pub logger: LoggerConfig,
-    // Add other configuration sections as needed
-}
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggerConfig {
@@ -44,6 +42,20 @@ pub struct LoggerConfig {
     pub log_max_age: u64,
     pub log_compress: bool,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModulesConfig {
+    pub logger_path: String,
+    pub paths: HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub logger: LoggerConfig,
+    pub modules: ModulesConfig,
+
+}
+
 
 
 impl Config {

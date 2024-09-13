@@ -21,39 +21,46 @@
 // SOFTWARE.
 //
 // Authors: I. Zeqiri, E. Gjergji 
-use std::sync::Arc;
+
 use tokio::sync::RwLock;
 use dashmap::DashMap;
+use std::sync::Arc;
+
 use futures::future::join_all;
+use zark_waf_common::messaging::Messenger;
 use crate::error::ModuleManagerError;
 use crate::module::{Module, ModuleInfo, ModuleStatus};
-use zark_waf_common::messaging::messenger::ZarkMessenger;
 
 pub struct ModuleSupervisor {
     modules: DashMap<String, Arc<RwLock<Box<dyn Module>>>>,
-    messenger: Arc<ZarkMessenger>,
+    messenger: Option<Arc<dyn Messenger>>,
 }
 
 impl ModuleSupervisor {
-    pub fn new(messenger: Arc<ZarkMessenger>) -> Self {
+    pub fn new() -> Self {
         Self {
             modules: DashMap::new(),
-            messenger,
+            messenger: None,
         }
     }
 
-    pub async fn add_module(&self, module: Box<dyn Module>) -> Result<(), ModuleManagerError> {
-        let name = module.name().to_string();
-        let mut module = module;
-        module.init(self.messenger.clone()).await.map_err(|e| ModuleManagerError::InitializationError(e.to_string()))?;
-        self.modules.insert(name.clone(), Arc::new(RwLock::new(module)));
+    pub fn set_messenger(&mut self, messenger: Arc<dyn Messenger>) {
+        self.messenger = Some(messenger);
+    }
+
+    pub fn get_messenger(&self) -> Option<Arc<dyn Messenger>> {
+        self.messenger.clone()
+    }
+
+    pub async fn add_module(&self, name: String, module: Arc<RwLock<Box<dyn Module>>>) -> Result<(), ModuleManagerError> {
+        self.modules.insert(name, module);
         Ok(())
     }
 
     pub async fn remove_module(&self, name: &str) -> Result<(), ModuleManagerError> {
         if let Some((_, module)) = self.modules.remove(name) {
-            let module = module.write().await;
-            module.stop().await.map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+            let mut module = module.write().await;
+            module.shutdown().await.map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
         } else {
             return Err(ModuleManagerError::ModuleNotFound(name.to_string()));
         }
@@ -65,7 +72,7 @@ impl ModuleSupervisor {
             let module = entry.value().clone();
             async move {
                 let module = module.read().await;
-                module.start().await
+                module.execute(serde_json::json!({"action": "start"})).await
             }
         }).collect();
 
@@ -75,16 +82,11 @@ impl ModuleSupervisor {
     }
 
     pub async fn stop_all(&self) -> Result<(), ModuleManagerError> {
-        let futures: Vec<_> = self.modules.iter().map(|entry| {
-            let module = entry.value().clone();
-            async move {
-                let module = module.read().await;
-                module.stop().await
-            }
-        }).collect();
-
-        join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()
-            .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+        for module in self.modules.iter() {
+            let mut module = module.value().write().await;
+            module.shutdown().await
+                .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+        }
         Ok(())
     }
 
@@ -95,7 +97,7 @@ impl ModuleSupervisor {
                 name: module.name().to_string(),
                 version: module.version().to_string(),
                 description: module.description().to_string(),
-                status: ModuleStatus::Running, // This should be more dynamic in a real implementation
+                status: ModuleStatus::Running,
             })
         } else {
             Err(ModuleManagerError::ModuleNotFound(name.to_string()))
@@ -109,8 +111,9 @@ impl ModuleSupervisor {
                 name: module.name().to_string(),
                 version: module.version().to_string(),
                 description: module.description().to_string(),
-                status: ModuleStatus::Running, // This should be more dynamic in a real implementation
+                status: ModuleStatus::Running,
             }
         }).collect()
     }
+
 }

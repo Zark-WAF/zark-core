@@ -22,7 +22,8 @@
 //
 // Authors: I. Zeqiri, E. Gjergji 
 
-use std::sync::Arc;
+use tokio::sync::RwLock;
+use std::{collections::HashMap, ffi::c_void, sync::Arc};
 
 mod error;
 mod supervisor;
@@ -34,47 +35,71 @@ pub use supervisor::ModuleSupervisor;
 pub use loader::ModuleLoader;
 pub use module::{Module, ModuleInfo};
 
-use zark_waf_common::messaging::messenger::ZarkMessenger;
+
 
 pub struct ModuleManager {
-    supervisor: Arc<ModuleSupervisor>,
+    modules: HashMap<String, Box<dyn Module>>,
+    messenger: *mut c_void,
     loader: ModuleLoader,
 }
 
+
+
+
+
 impl ModuleManager {
-    pub fn new(messenger: Arc<ZarkMessenger>) -> Self {
+    pub fn new(messenger: *mut c_void) -> Self {
         Self {
-            supervisor: Arc::new(ModuleSupervisor::new(messenger)),
+            modules: HashMap::new(),
+            messenger,
             loader: ModuleLoader::new(),
         }
     }
 
-    pub async fn load_module(&self, path: &str) -> Result<(), ModuleManagerError> {
-        let module = self.loader.load(path).await?;
-        self.supervisor.add_module(module).await?;
+    
+
+    pub async fn load_module(&mut self, path: &str) -> Result<(), ModuleManagerError> {
+        let mut module = self.loader.load(path)?;
+        let name = module.name().to_string();
+
+        module.init(self.messenger).await
+            .map_err(|e| ModuleManagerError::InitializationError(e.to_string()))?;
+
+        self.modules.insert(name, module);
         Ok(())
     }
 
+
     pub async fn unload_module(&self, name: &str) -> Result<(), ModuleManagerError> {
-        self.supervisor.remove_module(name).await?;
+        let _ = name;
         Ok(())
     }
 
     pub async fn start_all_modules(&self) -> Result<(), ModuleManagerError> {
-        self.supervisor.start_all().await?;
         Ok(())
     }
 
     pub async fn stop_all_modules(&self) -> Result<(), ModuleManagerError> {
-        self.supervisor.stop_all().await?;
         Ok(())
     }
-
     pub async fn get_module_info(&self, name: &str) -> Result<ModuleInfo, ModuleManagerError> {
-        self.supervisor.get_module_info(name).await
+        self.modules.get(name)
+            .ok_or(ModuleManagerError::ModuleNotFound(name.to_string()))
+            .map(|module| ModuleInfo {
+                name: module.name().to_string(),
+                version: module.version().to_string(),
+                description: module.description().to_string(),
+                status: todo!(),
+            })
     }
 
     pub async fn list_modules(&self) -> Vec<ModuleInfo> {
-        self.supervisor.list_modules().await
+        let mut module_info_list = Vec::new();
+        for (name, module) in &self.modules {
+            if let Ok(info) = self.get_module_info(name).await {
+                module_info_list.push(info);
+            }
+        }
+        module_info_list
     }
 }

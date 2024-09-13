@@ -1,0 +1,28 @@
+[package]
+name = "zark_waf_messenger"
+version = "0.1.0"
+edition = "2021"
+authors = ["I. Zeqiri <indrit.zeqiri@gmail.com>", "E. Gjergji <eriol@rtsoftwaregroup.io>"]
+description = "An in-shared memory broker IPC for ZARK-WAF"
+license = "MIT"
+repository = "https://github.com/Zark-WAF/zark-core"
+    
+
+[dependencies]
+log = "0.4"
+fern = { version = "0.6", features = ["colored"] }
+chrono = "0.4"
+serde_json = "1.0"
+serde = "1.0"
+thiserror = "1.0"
+async-trait = "0.1"
+tokio = { version = "1.0", features = ["full"] }
+syslog = "6.0"
+
+zark_waf_common = { path = "../../crates/common" }
+zark_waf_config_manager = { path = "../../crates/config_manager" }
+
+
+[lib]
+name = "zark_waf_messenger"
+crate-type = ["cdylib"]
