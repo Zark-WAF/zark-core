@@ -27,44 +27,45 @@ use dashmap::DashMap;
 use std::sync::Arc;
 
 use futures::future::join_all;
-use zark_waf_common::messaging::Messenger;
+use zark_waf_common::messenger::Messenger;
 use crate::error::ModuleManagerError;
 use crate::module::{Module, ModuleInfo, ModuleStatus};
 
 pub struct ModuleSupervisor {
     modules: DashMap<String, Arc<RwLock<Box<dyn Module>>>>,
-    messenger: Option<Arc<dyn Messenger>>,
+    messenger: Arc<Messenger>,
 }
 
 impl ModuleSupervisor {
-    pub fn new() -> Self {
+    pub fn new(messenger: Arc<Messenger>) -> Self {
         Self {
             modules: DashMap::new(),
-            messenger: None,
+            messenger,
         }
     }
 
-    pub fn set_messenger(&mut self, messenger: Arc<dyn Messenger>) {
-        self.messenger = Some(messenger);
-    }
-
-    pub fn get_messenger(&self) -> Option<Arc<dyn Messenger>> {
-        self.messenger.clone()
-    }
+    // remove set_messenger and get_messenger methods as they're no longer needed
 
     pub async fn add_module(&self, name: String, module: Arc<RwLock<Box<dyn Module>>>) -> Result<(), ModuleManagerError> {
-        self.modules.insert(name, module);
+        self.modules.insert(name.clone(), module);
+        // notify about module addition
+        self.messenger.send( "module_", b"module added").await
+            .map_err(|e| ModuleManagerError::InitializationError(e.to_string()))?;
         Ok(())
     }
 
     pub async fn remove_module(&self, name: &str) -> Result<(), ModuleManagerError> {
         if let Some((_, module)) = self.modules.remove(name) {
             let mut module = module.write().await;
-            module.shutdown().await.map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+            module.shutdown().await
+                .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+            // notify about module removal
+            self.messenger.send("module_", b"module removed").await
+                .map_err(|e| ModuleManagerError::InvalidModule(e.to_string()))?;
+            Ok(())
         } else {
-            return Err(ModuleManagerError::ModuleNotFound(name.to_string()));
+            Err(ModuleManagerError::ModuleNotFound(name.to_string()))
         }
-        Ok(())
     }
 
     pub async fn start_all(&self) -> Result<(), ModuleManagerError> {
@@ -73,11 +74,16 @@ impl ModuleSupervisor {
             async move {
                 let module = module.read().await;
                 module.execute(serde_json::json!({"action": "start"})).await
+                    .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
+                // notify about module start
+                self.messenger.send("module_", b"module started").await
+                    .map_err(|e| ModuleManagerError::LoadError(e.to_string()))?;
+                Ok(())
             }
         }).collect();
 
         join_all(futures).await.into_iter().collect::<Result<Vec<_>, _>>()
-            .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
+            .map_err(|e: ModuleManagerError| ModuleManagerError::ExecutionError(e.to_string()))?;
         Ok(())
     }
 
@@ -85,6 +91,9 @@ impl ModuleSupervisor {
         for module in self.modules.iter() {
             let mut module = module.value().write().await;
             module.shutdown().await
+                .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+            // notify about module stop
+            self.messenger.send("module_", b"module stopped").await
                 .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
         }
         Ok(())

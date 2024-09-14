@@ -32,32 +32,25 @@ use tokio::sync::RwLock;
 use zark_waf_config_manager::config::Config;
 use zark_waf_module_manager::{Module, ModuleManager};
 use zark_waf_plugin_system::PluginSystem;
-
-// External C functions for messenger management
-extern "C" {
-    fn create_messenger() -> *mut c_void;
-    fn delete_messenger(messenger: *mut c_void);
-}
-
-
+use zark_waf_common::messenger::Messenger;
 
 pub struct ZarkWafCore {
     config: Config,
     state: Arc<RwLock<CoreState>>,
     module_manager: ModuleManager,
     plugin_system: PluginSystem,
-    messenger: *mut c_void,
-,
+    messenger: Arc<Messenger>,
 }
 
 impl ZarkWafCore {
     pub async fn new(config_path: &str) -> Result<Self, CoreError> {
         let config = Config::load(config_path).await.map_err(CoreError::ConfigError)?;
 
-        // Create ZarkMessenger instance using the C function
-        let messenger = unsafe { create_messenger() };
-        let module_manager = ModuleManager::new(messenger);
-        let plugin_system = PluginSystem::new(messenger);                
+        // Create ZarkMessenger instance using the common crate messenger module
+        let messenger = Arc::new(Messenger::new(""));
+        
+        let module_manager = ModuleManager::new();
+        let plugin_system = PluginSystem::new();
 
         let core = Self {
             config,
@@ -67,7 +60,7 @@ impl ZarkWafCore {
             messenger,
         };
 
-        core.init();
+        core.init()?;
 
         Ok(core)
     }
@@ -93,7 +86,7 @@ impl ZarkWafCore {
                     log::info!("Shutdown signal received");
                     break;
                 }
-                
+                // Add other async tasks here if needed
             }
         }
 
@@ -105,7 +98,7 @@ impl ZarkWafCore {
         log::info!("Shutting down ZARK-WAF core");
 
         // Unload all modules
-        for (module_name, _) in &self.config.modules.paths {
+        for (module_name, _) in &self.config.modules {
             self.module_manager
                 .unload_module(module_name)
                 .await
@@ -123,9 +116,7 @@ impl ZarkWafCore {
             .await
             .map_err(|e| CoreError::ShutdownError(format!("Failed to unload logger: {}", e)))?;
 
-        unsafe {
-            //delete_messenger(self.messenger);
-        }
+        // The messenger will be automatically dropped when the Arc reference count reaches zero
 
         Ok(())
     }

@@ -22,52 +22,60 @@
 //
 // Authors: I. Zeqiri, E. Gjergji 
 
-use std::ffi::c_void;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use dashmap::DashMap;
+use zark_waf_common::messenger::Messenger;
 use crate::error::PluginError;
 use crate::plugin::{Plugin, PluginMetadata, PluginStatus};
 
 pub struct PluginManager {
     plugins: DashMap<String, Arc<RwLock<Box<dyn Plugin>>>>,
-    messenger: *mut c_void,
+    messenger: Arc<Messenger>,
 }
 
 impl PluginManager {
-    pub fn new(messenger: &mut c_void) -> Self {
+    // create a new plugin manager
+    pub fn new(messenger: Arc<Messenger>) -> Self {
         Self {
             plugins: DashMap::new(),
-            messenger: &messenger,
+            messenger,
         }
     }
 
+    // add a plugin to the manager
     pub async fn add_plugin(&self, mut plugin: Box<dyn Plugin>) -> Result<(), PluginError> {
         let name = plugin.name().to_string();
-        plugin.init(&self.messenger).await.map_err(|e| PluginError::InitializationError(e.to_string()))?;
+        plugin.init(&self.messenger).await
+            .map_err(|e| PluginError::InitializationError(e.to_string()))?;
         self.plugins.insert(name.clone(), Arc::new(RwLock::new(plugin)));
         Ok(())
     }
 
+    // remove a plugin from the manager
     pub async fn remove_plugin(&self, name: &str) -> Result<(), PluginError> {
         if let Some((_, plugin)) = self.plugins.remove(name) {
             let mut plugin = plugin.write().await;
-            plugin.shutdown().await.map_err(|e| PluginError::ShutdownError(e.to_string()))?;
+            plugin.shutdown().await
+                .map_err(|e| PluginError::ShutdownError(e.to_string()))?;
         } else {
             return Err(PluginError::PluginNotFound(name.to_string()));
         }
         Ok(())
     }
 
+    // execute a plugin
     pub async fn execute_plugin(&self, name: &str, input: serde_json::Value) -> Result<serde_json::Value, PluginError> {
         if let Some(plugin) = self.plugins.get(name) {
             let plugin = plugin.read().await;
-            plugin.execute(input).await.map_err(|e| PluginError::ExecutionError(e.to_string()))
+            plugin.execute(input).await
+                .map_err(|e| PluginError::ExecutionError(e.to_string()))
         } else {
             Err(PluginError::PluginNotFound(name.to_string()))
         }
     }
 
+    // get metadata for a specific plugin
     pub async fn get_plugin_metadata(&self, name: &str) -> Result<PluginMetadata, PluginError> {
         if let Some(plugin) = self.plugins.get(name) {
             let plugin = plugin.read().await;
@@ -82,6 +90,7 @@ impl PluginManager {
         }
     }
 
+    // list all plugins
     pub fn list_plugins(&self) -> Vec<PluginMetadata> {
         self.plugins.iter().map(|entry| {
             let plugin = entry.value().blocking_read();

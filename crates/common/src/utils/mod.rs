@@ -23,3 +23,5 @@
 // Authors: I. Zeqiri, E. Gjergji
 
 pub mod serialization;
+pub mod uid;
+

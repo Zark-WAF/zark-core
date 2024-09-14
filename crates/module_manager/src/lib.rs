@@ -22,9 +22,8 @@
 //
 // Authors: I. Zeqiri, E. Gjergji 
 
-use tokio::sync::RwLock;
-use std::{collections::HashMap, ffi::c_void, sync::Arc};
-
+use std::{collections::HashMap, sync::Arc};
+use zark_waf_common::messenger::Messenger;
 mod error;
 mod supervisor;
 mod loader;
@@ -35,53 +34,73 @@ pub use supervisor::ModuleSupervisor;
 pub use loader::ModuleLoader;
 pub use module::{Module, ModuleInfo};
 
-
-
 pub struct ModuleManager {
     modules: HashMap<String, Box<dyn Module>>,
-    messenger: *mut c_void,
     loader: ModuleLoader,
+    messenger: Arc<Messenger>,
 }
 
-
-
-
-
 impl ModuleManager {
-    pub fn new(messenger: *mut c_void) -> Self {
+    pub fn new() -> Self {
         Self {
             modules: HashMap::new(),
-            messenger,
             loader: ModuleLoader::new(),
+            messenger: Arc::new(Messenger::new("module_manager"))
         }
     }
 
-    
-
     pub async fn load_module(&mut self, path: &str) -> Result<(), ModuleManagerError> {
-        let mut module = self.loader.load(path)?;
+        let module = self.loader.load(path)?;
         let name = module.name().to_string();
 
-        module.init(self.messenger).await
-            .map_err(|e| ModuleManagerError::InitializationError(e.to_string()))?;
+        self.modules.insert(name.clone(), module);
+        
+        // Notify about module loading
+        self.messenger.send("module_manager", format!("Module '{}' loaded", name).as_bytes()).await
+            .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
 
-        self.modules.insert(name, module);
         Ok(())
     }
 
+    pub async fn unload_module(&mut self, name: &str) -> Result<(), ModuleManagerError> {
+        if let Some(mut module) = self.modules.remove(name) {
+            module.shutdown().await
+                .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
 
-    pub async fn unload_module(&self, name: &str) -> Result<(), ModuleManagerError> {
-        let _ = name;
+            // Notify about module unloading
+            self.messenger.send("module_manager", format!("Module '{}' unloaded", name).as_bytes()).await
+                .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
+
+            Ok(())
+        } else {
+            Err(ModuleManagerError::ModuleNotFound(name.to_string()))
+        }
+    }
+
+    pub async fn start_all_modules(&mut self) -> Result<(), ModuleManagerError> {
+        for (name, module) in self.modules.iter_mut() {
+            module.execute(serde_json::json!({"action": "start"})).await
+                .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
+
+            // Notify about module starting
+            self.messenger.send("module_manager", format!("Module '{}' started", name).as_bytes()).await
+                .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
+        }
         Ok(())
     }
 
-    pub async fn start_all_modules(&self) -> Result<(), ModuleManagerError> {
+    pub async fn stop_all_modules(&mut self) -> Result<(), ModuleManagerError> {
+        for (name, module) in self.modules.iter_mut() {
+            module.shutdown().await
+                .map_err(|e| ModuleManagerError::ShutdownError(e.to_string()))?;
+
+            // Notify about module stopping
+            self.messenger.send("module_manager", format!("Module '{}' stopped", name).as_bytes()).await
+                .map_err(|e| ModuleManagerError::ExecutionError(e.to_string()))?;
+        }
         Ok(())
     }
 
-    pub async fn stop_all_modules(&self) -> Result<(), ModuleManagerError> {
-        Ok(())
-    }
     pub async fn get_module_info(&self, name: &str) -> Result<ModuleInfo, ModuleManagerError> {
         self.modules.get(name)
             .ok_or(ModuleManagerError::ModuleNotFound(name.to_string()))
@@ -89,17 +108,16 @@ impl ModuleManager {
                 name: module.name().to_string(),
                 version: module.version().to_string(),
                 description: module.description().to_string(),
-                status: todo!(),
+                status: module::ModuleStatus::Running, // Assuming the module is running if it's loaded
             })
     }
 
     pub async fn list_modules(&self) -> Vec<ModuleInfo> {
-        let mut module_info_list = Vec::new();
-        for (name, module) in &self.modules {
-            if let Ok(info) = self.get_module_info(name).await {
-                module_info_list.push(info);
-            }
-        }
-        module_info_list
+        self.modules.iter().map(|(_, module)| ModuleInfo {
+            name: module.name().to_string(),
+            version: module.version().to_string(),
+            description: module.description().to_string(),
+            status: module::ModuleStatus::Running, // Assuming all loaded modules are running
+        }).collect()
     }
 }

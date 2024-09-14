@@ -24,7 +24,7 @@
 
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
-use std::ffi::c_void;
+use zark_waf_common::messenger::Messenger;
 
 #[async_trait]
 pub trait Plugin: Send + Sync {
@@ -32,7 +32,7 @@ pub trait Plugin: Send + Sync {
     fn version(&self) -> &str;
     fn description(&self) -> &str;
 
-    async fn init(&mut self, messenger: &c_void) -> Result<(), Box<dyn std::error::Error>>;
+    async fn init(&mut self, messenger: &Messenger) -> Result<(), Box<dyn std::error::Error>>;
     async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
     async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 }

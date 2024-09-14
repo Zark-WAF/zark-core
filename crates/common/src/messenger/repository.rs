@@ -22,20 +22,39 @@
 //
 // Authors: I. Zeqiri, E. Gjergji
 
-pub mod messenger;
-pub mod utils;
+use super::domain::{Topic, SubscriberId, Subscription};
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 
-use std::ffi::c_void;
-
-
-
-
-pub trait Module: Send + Sync {
-    fn name(&self) -> &str;
-    fn version(&self) -> &str;
-    fn description(&self) -> &str;
-    async fn init(&mut self, messenger: *mut c_void) -> Result<(), Box<dyn std::error::Error>>;
-    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>>;
-    async fn shutdown(&mut self) -> Result<(), Box<dyn std::error::Error>>;
+pub struct SubscriptionRepository {
+    subscriptions: RwLock<HashMap<Topic, Vec<Subscription>>>,
 }
 
+impl SubscriptionRepository {
+    pub fn new() -> Self {
+        Self {
+            subscriptions: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub async fn add(&self, subscription: Subscription) {
+        let mut subs = self.subscriptions.write().await;
+        subs.entry(subscription.subscriber.topic.clone())
+            .or_insert_with(Vec::new)
+            .push(subscription);
+    }
+
+    pub async fn remove(&self, topic: &Topic, subscriber_id: &SubscriberId) {
+        let mut subs = self.subscriptions.write().await;
+        if let Some(topic_subs) = subs.get_mut(topic) {
+            topic_subs.retain(|sub| sub.subscriber.id != *subscriber_id);
+        }
+    }
+
+    pub async fn get_subscriptions(&self, topic: &Topic) -> Vec<Subscription> {
+        let subs = self.subscriptions.read().await;
+        subs.get(topic)
+            .map(|subscriptions| subscriptions.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+}

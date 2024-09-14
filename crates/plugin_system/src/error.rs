@@ -55,4 +55,5 @@ pub enum PluginError {
 
     #[error("Library loading error: {0}")]
     LibraryError(#[from] libloading::Error),
+
 }
